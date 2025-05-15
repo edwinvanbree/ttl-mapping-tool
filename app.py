@@ -3,10 +3,8 @@ from rdflib import Graph, URIRef
 import pandas as pd
 from io import BytesIO
 from collections import defaultdict
-from urllib.parse import urlparse
-from pyvis.network import Network
-import tempfile
 import streamlit.components.v1 as components
+import json
 
 st.set_page_config(page_title="TTL Data Extractor", layout="wide")
 st.title("🧠 RDF Mapping Tool voor Eisen")
@@ -23,36 +21,54 @@ if uploaded_ttl and uploaded_excel:
     df_excel = pd.read_excel(uploaded_excel)
     kolommen = df_excel.columns.tolist()
 
-    # Verzamel predicates met voorbeelddata
+    # Verzamel unieke eigenschappen met voorbeelddata
     predicate_samples = defaultdict(list)
     for s, p, o in g:
         if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
             if len(predicate_samples[p]) < 3:
                 predicate_samples[p].append(str(o))
 
-    # Genereer interactieve GraphView
-    st.markdown("### 🧭 RDF Model Visualisatie")
-    net = Network(height='600px', directed=True)
+    predicates = list(predicate_samples.keys())
 
-    for s, p, o in g:
-        if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
-            net.add_node(str(s), label=str(s).split("/")[-1][:30], shape='ellipse')
-            net.add_node(str(o), label=str(o).split("/")[-1][:30], shape='box')
-            net.add_edge(str(s), str(o), label=str(p).split("/")[-1][:30])
+    # Genereer Cytoscape JSON
+    elements = []
+    added_edges = set()
+    for i, p in enumerate(predicates):
+        label = str(p).split("/")[-1]
+        node_id = f"pred_{i}"
+        elements.append({"data": {"id": node_id, "label": label}})
+        added_edges.add((node_id, label))
 
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
-    net.save_graph(tmp_file.name)
-    with open(tmp_file.name, 'r', encoding='utf-8') as f:
-        html = f.read()
-    components.html(html, height=600, scrolling=True)
+    # Inject cytoscapejs view
+    st.markdown("### 🧭 Klik op een eigenschap om een Excel-kolom te koppelen")
+    components.html(f"""
+    <html>
+    <head>
+      <script src="https://unpkg.com/cytoscape@3.19.1/dist/cytoscape.min.js"></script>
+    </head>
+    <body>
+    <div id="cy" style="width: 100%; height: 600px;"></div>
+    <script>
+    var cy = cytoscape({
+      container: document.getElementById('cy'),
+      elements: {json.dumps(elements)},
+      style: [
+        {{ selector: 'node', style: {{ 'label': 'data(label)', 'background-color': '#0074D9', 'color': '#fff', 'text-valign': 'center' }} }}
+      ],
+      layout: {{ name: 'grid', rows: 4 }}
+    });
+    </script>
+    </body>
+    </html>
+    """, height=620)
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
     predicate_map = {str(p): p for p in predicate_samples.keys()}
     kolom_mapping = {}
 
-    for kolom in kolommen:
+    for i, kolom in enumerate(kolommen):
         opties = [f"{str(p)} ➜ [{', '.join(predicate_samples[p])}]" for p in predicate_samples]
-        selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=kolom)
+        selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{i}")
         uri = selectie.split(" ➜ ")[0].strip()
         kolom_mapping[kolom] = URIRef(uri)
 

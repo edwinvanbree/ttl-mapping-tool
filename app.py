@@ -3,6 +3,7 @@ from rdflib import Graph, URIRef
 import pandas as pd
 from io import BytesIO
 from collections import defaultdict
+from urllib.parse import urlparse
 
 st.set_page_config(page_title="TTL Data Extractor", layout="wide")
 st.title("🧠 RDF Mapping Tool voor Eisen")
@@ -19,52 +20,66 @@ if uploaded_ttl and uploaded_excel:
     df_excel = pd.read_excel(uploaded_excel)
     kolommen = df_excel.columns.tolist()
 
-    # Verzamel predicates met voorbeelddata
+    # Verzamel predicates met voorbeelddata, gegroepeerd op namespace
     predicate_samples = defaultdict(list)
+    ns_tree = defaultdict(list)
+
     for s, p, o in g:
         if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
             if len(predicate_samples[p]) < 3:
                 predicate_samples[p].append(str(o))
+            parsed = urlparse(str(p))
+            base = parsed.scheme + "://" + parsed.netloc + parsed.path.rsplit("/", 1)[0]
+            ns_tree[base].append(p)
 
-    # Sorteer en toon alleen predicates met data
+    # Sorteer alleen predicates met data
     predicates = sorted(predicate_samples.keys(), key=lambda p: str(p))
 
     def format_predicate(p):
         voorbeeld = ", ".join(predicate_samples[p])
         return f"{str(p)}  ➜  [{voorbeeld}]"
 
-    formatted_options = [format_predicate(p) for p in predicates]
     predicate_map = {format_predicate(p): p for p in predicates}
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
     kolom_mapping = {}
 
     for kolom in kolommen:
-        selectie = st.selectbox(f"Koppel RDF eigenschap aan kolom '{kolom}'", formatted_options, key=kolom)
-        kolom_mapping[kolom] = predicate_map[selectie]
+        with st.expander(f"Koppel RDF eigenschap aan kolom '{kolom}'"):
+            for base, props in sorted(ns_tree.items()):
+                with st.container():
+                    st.markdown(f"**{base}**")
+                    opts = [format_predicate(p) for p in props if p in predicate_samples]
+                    if opts:
+                        selectie = st.radio("Kies eigenschap", opts, key=f"{kolom}_{base}", label_visibility="collapsed")
+                        kolom_mapping[kolom] = predicate_map[selectie]
+                        break
 
-    root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
-
-    # Bouw resultaat
-    resultaat_data = []
-    for s in set(g.subjects()):
-        root_waarde = g.value(subject=s, predicate=kolom_mapping[root_kolom])
-        if root_waarde:
-            rij = {root_kolom: str(root_waarde)}
-            for kolom, pred in kolom_mapping.items():
-                if kolom == root_kolom:
-                    continue
-                val = g.value(subject=s, predicate=pred)
-                rij[kolom] = str(val) if val else ""
-            resultaat_data.append(rij)
-
-    if resultaat_data:
-        df_resultaat = pd.DataFrame(resultaat_data)
-        st.markdown("### 📋 Gematchte Data")
-        st.dataframe(df_resultaat)
-
-        buffer = BytesIO()
-        df_resultaat.to_excel(buffer, index=False)
-        st.download_button("📥 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
+    if len(kolom_mapping) < len(kolommen):
+        st.warning("Niet alle kolommen zijn gemapped.")
     else:
-        st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")
+        root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
+
+        # Bouw resultaat
+        resultaat_data = []
+        for s in set(g.subjects()):
+            root_waarde = g.value(subject=s, predicate=kolom_mapping[root_kolom])
+            if root_waarde:
+                rij = {root_kolom: str(root_waarde)}
+                for kolom, pred in kolom_mapping.items():
+                    if kolom == root_kolom:
+                        continue
+                    val = g.value(subject=s, predicate=pred)
+                    rij[kolom] = str(val) if val else ""
+                resultaat_data.append(rij)
+
+        if resultaat_data:
+            df_resultaat = pd.DataFrame(resultaat_data)
+            st.markdown("### 📋 Gematchte Data")
+            st.dataframe(df_resultaat)
+
+            buffer = BytesIO()
+            df_resultaat.to_excel(buffer, index=False)
+            st.download_button("📥 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
+        else:
+            st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")

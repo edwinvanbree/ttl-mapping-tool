@@ -39,18 +39,20 @@ if uploaded_ttl and uploaded_excel:
 
     for kolom in kolommen:
         opties = ["-- Maak een keuze --"] + [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
-        default_index = 0
-        if st.session_state.kolom_mapping.get(kolom):
+        huidige_keuze = st.session_state.kolom_mapping.get(kolom)
+        default_value = "-- Maak een keuze --"
+
+        if huidige_keuze:
             try:
-                uri_str = str(st.session_state.kolom_mapping[kolom])
-                default_index = opties.index(next(opt for opt in opties if opt.startswith(uri_str)))
+                label = next(opt for opt in opties if opt.startswith(str(huidige_keuze)))
+                default_value = label
             except StopIteration:
-                default_index = 0
+                pass
 
         selectie = st.selectbox(
             f"Kies RDF eigenschap voor kolom '{kolom}'",
             opties,
-            index=default_index,
+            index=opties.index(default_value) if default_value in opties else 0,
             key=f"select_{kolom}"
         )
 

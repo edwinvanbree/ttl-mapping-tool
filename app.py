@@ -7,12 +7,17 @@ from collections import defaultdict
 st.set_page_config(page_title="TTL Data Extractor", layout="wide")
 st.title("🧠 RDF Mapping Tool voor Eisen")
 
-uploaded_file = st.file_uploader("Upload een .ttl bestand", type=["ttl"])
+uploaded_ttl = st.file_uploader("Upload een .ttl bestand", type=["ttl"])
+uploaded_excel = st.file_uploader("Upload een Excel bestand met kolomkoppen op rij 1", type=["xlsx"])
 
-if uploaded_file:
+if uploaded_ttl and uploaded_excel:
     # Parse RDF
     g = Graph()
-    g.parse(uploaded_file, format="turtle")
+    g.parse(uploaded_ttl, format="turtle")
+
+    # Lees Excel
+    df_excel = pd.read_excel(uploaded_excel)
+    kolommen = df_excel.columns.tolist()
 
     # Verzamel predicates met voorbeelddata
     predicate_samples = defaultdict(list)
@@ -31,41 +36,35 @@ if uploaded_file:
     formatted_options = [format_predicate(p) for p in predicates]
     predicate_map = {format_predicate(p): p for p in predicates}
 
-    st.markdown("### 🗂️ Mapping instellen")
-    col1, col2, col3 = st.columns(3)
+    st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
+    kolom_mapping = {}
 
-    with col1:
-        predicate_eis_f = st.selectbox("Kies eigenschap voor 'Eis'", formatted_options)
-    with col2:
-        predicate_tekst_f = st.selectbox("Kies eigenschap voor 'Eistekst'", formatted_options)
-    with col3:
-        predicate_object_f = st.selectbox("Kies eigenschap voor 'Object'", formatted_options)
+    for kolom in kolommen:
+        selectie = st.selectbox(f"Koppel RDF eigenschap aan kolom '{kolom}'", formatted_options, key=kolom)
+        kolom_mapping[kolom] = predicate_map[selectie]
 
-    # Zet om naar URIRef
-    pred_eis = predicate_map[predicate_eis_f]
-    pred_tekst = predicate_map[predicate_tekst_f]
-    pred_object = predicate_map[predicate_object_f]
+    root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
 
-    # Verzamel triples
-    eis_data = []
+    # Bouw resultaat
+    resultaat_data = []
     for s in set(g.subjects()):
-        eis = g.value(subject=s, predicate=pred_eis)
-        tekst = g.value(subject=s, predicate=pred_tekst)
-        obj = g.value(subject=s, predicate=pred_object)
-        if eis or tekst or obj:
-            eis_data.append({
-                "Eis": str(eis) if eis else "",
-                "Eistekst": str(tekst) if tekst else "",
-                "Object": str(obj) if obj else ""
-            })
+        root_waarde = g.value(subject=s, predicate=kolom_mapping[root_kolom])
+        if root_waarde:
+            rij = {root_kolom: str(root_waarde)}
+            for kolom, pred in kolom_mapping.items():
+                if kolom == root_kolom:
+                    continue
+                val = g.value(subject=s, predicate=pred)
+                rij[kolom] = str(val) if val else ""
+            resultaat_data.append(rij)
 
-    if eis_data:
-        df = pd.DataFrame(eis_data)
-        st.markdown("### 📋 Resultaat")
-        st.dataframe(df)
+    if resultaat_data:
+        df_resultaat = pd.DataFrame(resultaat_data)
+        st.markdown("### 📋 Gematchte Data")
+        st.dataframe(df_resultaat)
 
         buffer = BytesIO()
-        df.to_excel(buffer, index=False)
-        st.download_button("📅 Download als Excel", buffer.getvalue(), file_name="eisen_export.xlsx")
+        df_resultaat.to_excel(buffer, index=False)
+        st.download_button("📥 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
     else:
-        st.info("Geen data gevonden op basis van de gekozen mappings.")
+        st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")

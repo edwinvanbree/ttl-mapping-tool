@@ -3,8 +3,6 @@ from rdflib import Graph, URIRef
 import pandas as pd
 from io import BytesIO
 from collections import defaultdict
-import streamlit.components.v1 as components
-import json
 
 st.set_page_config(page_title="TTL Data Extractor", layout="wide")
 st.title("🧠 RDF Mapping Tool voor Eisen")
@@ -29,52 +27,35 @@ if uploaded_ttl and uploaded_excel:
                 predicate_samples[p] = str(o)
 
     predicates = list(predicate_samples.keys())
-
-    # Genereer Cytoscape JSON
-    elements = []
-    for i, p in enumerate(predicates):
-        label = str(p).split("/")[-1]
-        node_id = f"pred_{i}"
-        elements.append({"data": {"id": node_id, "label": label}})
-
-    # Inject cytoscapejs view
-    st.markdown("### 🧭 RDF Eigenschappenoverzicht")
-    components.html(f"""
-    <html>
-    <head>
-      <script src="https://unpkg.com/cytoscape@3.19.1/dist/cytoscape.min.js"></script>
-    </head>
-    <body>
-    <div id="cy" style="width: 100%; height: 600px;"></div>
-    <script>
-    var cy = cytoscape({{
-      container: document.getElementById('cy'),
-      elements: {json.dumps(elements)},
-      style: [
-        {{ selector: 'node', style: {{ 'label': 'data(label)', 'background-color': '#0074D9', 'color': '#fff', 'text-valign': 'center' }} }}
-      ],
-      layout: {{ name: 'grid', rows: 4 }}
-    }});
-    </script>
-    </body>
-    </html>
-    """, height=620)
-
-    st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
     predicate_map = {str(p): p for p in predicate_samples.keys()}
+    gebruikte_predicaten = set()
     kolom_mapping = {}
 
+    st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
+
+    # Root-kolom eerst kiezen
+    root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
+
     for i, kolom in enumerate(kolommen):
-        opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in predicate_samples]
+        if kolom in kolom_mapping:
+            continue
+
+        beschikbare_predicaten = [p for p in predicate_samples if p not in gebruikte_predicaten]
+        opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in beschikbare_predicaten]
+
+        if not opties:
+            st.warning("Er zijn geen beschikbare RDF-eigenschappen meer om te koppelen.")
+            break
+
         selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{i}")
         uri = selectie.split(" ➜ ")[0].strip()
-        kolom_mapping[kolom] = URIRef(uri)
+        gekozen_pred = URIRef(uri)
+        kolom_mapping[kolom] = gekozen_pred
+        gebruikte_predicaten.add(gekozen_pred)
 
     if len(kolom_mapping) < len(kolommen):
         st.warning("Niet alle kolommen zijn gemapped.")
     else:
-        root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
-
         # Bouw resultaat
         resultaat_data = []
         for s in set(g.subjects()):

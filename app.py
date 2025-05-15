@@ -35,14 +35,20 @@ if uploaded_ttl and uploaded_excel:
 
     with st.form("mapping_form"):
         gekozen_mapping = {}
-        beschikbare_predicaten = list(predicate_samples.keys())
+        opties_per_kolom = {}
 
         for kolom in kolommen:
-            opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in beschikbare_predicaten]
-            selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{kolom}")
-            uri = selectie.split(" ➜ ")[0].strip()
+            opties = [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
+            opties_per_kolom[kolom] = opties
+
+        for kolom in kolommen:
+            selectie = st.selectbox(
+                f"Kies RDF eigenschap voor kolom '{kolom}'",
+                opties_per_kolom[kolom],
+                key=f"select_{kolom}"
+            )
+            uri = selectie.split(" ➔ ")[0].strip()
             gekozen_mapping[kolom] = URIRef(uri)
-            beschikbare_predicaten = [p for p in beschikbare_predicaten if str(p) != uri]
 
         submitted = st.form_submit_button("Bevestig mapping")
 
@@ -71,6 +77,6 @@ if uploaded_ttl and uploaded_excel:
 
             buffer = BytesIO()
             df_resultaat.to_excel(buffer, index=False)
-            st.download_button("📥 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
+            st.download_button("📅 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
         else:
             st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")

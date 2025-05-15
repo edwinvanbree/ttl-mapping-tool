@@ -27,7 +27,7 @@ if uploaded_ttl and uploaded_excel:
                 predicate_samples[p] = str(o)
 
     predicates = list(predicate_samples.keys())
-    predicate_map = {str(p): p for p in predicate_samples.keys()}
+    predicate_labels = {str(p): f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates}
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
 
@@ -35,33 +35,33 @@ if uploaded_ttl and uploaded_excel:
 
     # Initialiseer de mapping als die nog niet bestaat
     if 'kolom_mapping' not in st.session_state:
-        st.session_state.kolom_mapping = {kolom: None for kolom in kolommen}
+        st.session_state.kolom_mapping = {kolom: "" for kolom in kolommen}
 
     for kolom in kolommen:
-        opties = ["-- Maak een keuze --"] + [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
-        huidige_keuze = st.session_state.kolom_mapping.get(kolom)
-        default_value = "-- Maak een keuze --"
+        opties = ["-- Maak een keuze --"] + [predicate_labels[str(p)] for p in predicates]
+        huidige_uri = st.session_state.kolom_mapping.get(kolom, "")
 
-        if huidige_keuze:
-            try:
-                label = next(opt for opt in opties if opt.startswith(str(huidige_keuze)))
-                default_value = label
-            except StopIteration:
-                pass
+        default_index = 0
+        if huidige_uri:
+            for i, opt in enumerate(opties):
+                if opt.startswith(huidige_uri):
+                    default_index = i
+                    break
 
         selectie = st.selectbox(
             f"Kies RDF eigenschap voor kolom '{kolom}'",
             opties,
-            index=opties.index(default_value) if default_value in opties else 0,
+            index=default_index,
             key=f"select_{kolom}"
         )
 
         if selectie != "-- Maak een keuze --":
             uri = selectie.split(" ➔ ")[0].strip()
-            st.session_state.kolom_mapping[kolom] = URIRef(uri)
+            st.session_state.kolom_mapping[kolom] = uri
 
     if all(st.session_state.kolom_mapping.values()):
-        kolom_mapping = st.session_state.kolom_mapping
+        kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items()}
+
         # Bouw resultaat
         resultaat_data = []
         for s in set(g.subjects()):

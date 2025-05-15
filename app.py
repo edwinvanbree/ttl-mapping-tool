@@ -33,29 +33,38 @@ if uploaded_ttl and uploaded_excel:
 
     root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
 
+    # Initialiseer de mapping als die nog niet bestaat
+    if 'kolom_mapping' not in st.session_state:
+        st.session_state.kolom_mapping = {kolom: None for kolom in kolommen}
+
     with st.form("mapping_form"):
-        gekozen_mapping = {}
-        opties_per_kolom = {}
-
         for kolom in kolommen:
-            opties = [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
-            opties_per_kolom[kolom] = opties
+            opties = ["-- Maak een keuze --"] + [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
+            default_index = 0
+            if st.session_state.kolom_mapping.get(kolom):
+                try:
+                    uri_str = str(st.session_state.kolom_mapping[kolom])
+                    default_index = opties.index(next(opt for opt in opties if opt.startswith(uri_str)))
+                except StopIteration:
+                    default_index = 0
 
-        for kolom in kolommen:
             selectie = st.selectbox(
                 f"Kies RDF eigenschap voor kolom '{kolom}'",
-                opties_per_kolom[kolom],
+                opties,
+                index=default_index,
                 key=f"select_{kolom}"
             )
-            uri = selectie.split(" ➔ ")[0].strip()
-            gekozen_mapping[kolom] = URIRef(uri)
+
+            if selectie != "-- Maak een keuze --":
+                uri = selectie.split(" ➔ ")[0].strip()
+                st.session_state.kolom_mapping[kolom] = URIRef(uri)
 
         submitted = st.form_submit_button("Bevestig mapping")
 
     if submitted:
-        st.session_state.kolom_mapping = gekozen_mapping
+        st.success("Mapping bevestigd.")
 
-    if "kolom_mapping" in st.session_state and len(st.session_state.kolom_mapping) == len(kolommen):
+    if all(st.session_state.kolom_mapping.values()):
         kolom_mapping = st.session_state.kolom_mapping
         # Bouw resultaat
         resultaat_data = []

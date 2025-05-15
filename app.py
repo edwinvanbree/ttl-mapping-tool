@@ -58,18 +58,19 @@ if uploaded_ttl and uploaded_excel:
             if uri:
                 st.session_state.kolom_mapping[kolom] = uri
 
-    if all(st.session_state.kolom_mapping.values()):
-        kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items()}
+    # Check alleen op niet-root kolommen
+    niet_root_kolommen = [k for k in kolommen if k != root_kolom]
+    if all(st.session_state.kolom_mapping.get(k) for k in niet_root_kolommen):
+        kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items() if uri}
 
         # Bouw resultaat
         resultaat_data = []
         for s in set(g.subjects()):
-            root_waarde = g.value(subject=s, predicate=kolom_mapping[root_kolom])
+            root_waarde = g.value(subject=s, predicate=kolom_mapping.get(root_kolom))
             if root_waarde:
                 rij = {root_kolom: str(root_waarde)}
-                for kolom, pred in kolom_mapping.items():
-                    if kolom == root_kolom:
-                        continue
+                for kolom in niet_root_kolommen:
+                    pred = kolom_mapping.get(kolom)
                     val = g.value(subject=s, predicate=pred)
                     rij[kolom] = str(val) if val else ""
                 resultaat_data.append(rij)
@@ -84,3 +85,5 @@ if uploaded_ttl and uploaded_excel:
             st.download_button("📅 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
         else:
             st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")
+    else:
+        st.info("Wacht op volledige mapping van alle kolommen behalve de root.")

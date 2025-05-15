@@ -28,34 +28,40 @@ if uploaded_ttl and uploaded_excel:
 
     predicates = list(predicate_samples.keys())
     predicate_map = {str(p): p for p in predicate_samples.keys()}
-    gebruikte_predicaten = set()
-    kolom_mapping = {}
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
 
     # Root-kolom eerst kiezen
     root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
 
+    # Initialiseer session state mapping als het er nog niet is
+    if 'kolom_mapping' not in st.session_state:
+        st.session_state.kolom_mapping = {}
+        st.session_state.gebruikte_predicaten = set()
+
     for i, kolom in enumerate(kolommen):
-        if kolom in kolom_mapping:
+        if kolom in st.session_state.kolom_mapping:
+            gekozen = st.session_state.kolom_mapping[kolom]
+            st.markdown(f"**{kolom}** is gekoppeld aan: `{gekozen}`")
             continue
 
-        beschikbare_predicaten = [p for p in predicate_samples if p not in gebruikte_predicaten]
+        beschikbare_predicaten = [p for p in predicate_samples if p not in st.session_state.gebruikte_predicaten]
         opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in beschikbare_predicaten]
 
         if not opties:
             st.warning("Er zijn geen beschikbare RDF-eigenschappen meer om te koppelen.")
             break
 
-        selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{i}")
+        selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{kolom}")
         uri = selectie.split(" ➜ ")[0].strip()
         gekozen_pred = URIRef(uri)
-        kolom_mapping[kolom] = gekozen_pred
-        gebruikte_predicaten.add(gekozen_pred)
+        st.session_state.kolom_mapping[kolom] = gekozen_pred
+        st.session_state.gebruikte_predicaten.add(gekozen_pred)
 
-    if len(kolom_mapping) < len(kolommen):
+    if len(st.session_state.kolom_mapping) < len(kolommen):
         st.warning("Niet alle kolommen zijn gemapped.")
     else:
+        kolom_mapping = st.session_state.kolom_mapping
         # Bouw resultaat
         resultaat_data = []
         for s in set(g.subjects()):

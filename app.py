@@ -1,5 +1,5 @@
 import streamlit as st
-from rdflib import Graph
+from rdflib import Graph, URIRef
 import pandas as pd
 from io import BytesIO
 
@@ -26,12 +26,17 @@ if uploaded_file:
     with col3:
         predicate_object = st.selectbox("Kies eigenschap voor 'Object'", predicates)
 
+    # Zet om naar URIRef
+    pred_eis = URIRef(predicate_eis)
+    pred_tekst = URIRef(predicate_tekst)
+    pred_object = URIRef(predicate_object)
+
     # Verzamel triples
     eis_data = []
     for s in set(g.subjects()):
-        eis = g.value(subject=s, predicate=predicate_eis)
-        tekst = g.value(subject=s, predicate=predicate_tekst)
-        obj = g.value(subject=s, predicate=predicate_object)
+        eis = g.value(subject=s, predicate=pred_eis)
+        tekst = g.value(subject=s, predicate=pred_tekst)
+        obj = g.value(subject=s, predicate=pred_object)
         if eis or tekst or obj:
             eis_data.append({
                 "Eis": str(eis) if eis else "",
@@ -46,6 +51,6 @@ if uploaded_file:
 
         buffer = BytesIO()
         df.to_excel(buffer, index=False)
-        st.download_button("📥 Download als Excel", buffer.getvalue(), file_name="eisen_export.xlsx")
+        st.download_button("📅 Download als Excel", buffer.getvalue(), file_name="eisen_export.xlsx")
     else:
         st.info("Geen data gevonden op basis van de gekozen mappings.")

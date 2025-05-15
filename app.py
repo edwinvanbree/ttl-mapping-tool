@@ -2,6 +2,7 @@ import streamlit as st
 from rdflib import Graph, URIRef
 import pandas as pd
 from io import BytesIO
+from collections import defaultdict
 
 st.set_page_config(page_title="TTL Data Extractor", layout="wide")
 st.title("🧠 RDF Mapping Tool voor Eisen")
@@ -13,23 +14,37 @@ if uploaded_file:
     g = Graph()
     g.parse(uploaded_file, format="turtle")
 
-    # Extract predicates
-    predicates = sorted(set(str(p) for _, p, _ in g if not p.startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#")))
+    # Verzamel predicates met voorbeelddata
+    predicate_samples = defaultdict(list)
+    for s, p, o in g:
+        if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
+            if len(predicate_samples[p]) < 3:
+                predicate_samples[p].append(str(o))
+
+    # Sorteer en toon alleen predicates met data
+    predicates = sorted(predicate_samples.keys(), key=lambda p: str(p))
+
+    def format_predicate(p):
+        voorbeeld = ", ".join(predicate_samples[p])
+        return f"{str(p)}  ➜  [{voorbeeld}]"
+
+    formatted_options = [format_predicate(p) for p in predicates]
+    predicate_map = {format_predicate(p): p for p in predicates}
 
     st.markdown("### 🗂️ Mapping instellen")
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        predicate_eis = st.selectbox("Kies eigenschap voor 'Eis'", predicates)
+        predicate_eis_f = st.selectbox("Kies eigenschap voor 'Eis'", formatted_options)
     with col2:
-        predicate_tekst = st.selectbox("Kies eigenschap voor 'Eistekst'", predicates)
+        predicate_tekst_f = st.selectbox("Kies eigenschap voor 'Eistekst'", formatted_options)
     with col3:
-        predicate_object = st.selectbox("Kies eigenschap voor 'Object'", predicates)
+        predicate_object_f = st.selectbox("Kies eigenschap voor 'Object'", formatted_options)
 
     # Zet om naar URIRef
-    pred_eis = URIRef(predicate_eis)
-    pred_tekst = URIRef(predicate_tekst)
-    pred_object = URIRef(predicate_object)
+    pred_eis = predicate_map[predicate_eis_f]
+    pred_tekst = predicate_map[predicate_tekst_f]
+    pred_object = predicate_map[predicate_object_f]
 
     # Verzamel triples
     eis_data = []

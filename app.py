@@ -4,6 +4,9 @@ import pandas as pd
 from io import BytesIO
 from collections import defaultdict
 from urllib.parse import urlparse
+from pyvis.network import Network
+import tempfile
+import streamlit.components.v1 as components
 
 st.set_page_config(page_title="TTL Data Extractor", layout="wide")
 st.title("🧠 RDF Mapping Tool voor Eisen")
@@ -20,40 +23,38 @@ if uploaded_ttl and uploaded_excel:
     df_excel = pd.read_excel(uploaded_excel)
     kolommen = df_excel.columns.tolist()
 
-    # Verzamel predicates met voorbeelddata, gegroepeerd op namespace
+    # Verzamel predicates met voorbeelddata
     predicate_samples = defaultdict(list)
-    ns_tree = defaultdict(list)
-
     for s, p, o in g:
         if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
             if len(predicate_samples[p]) < 3:
                 predicate_samples[p].append(str(o))
-            parsed = urlparse(str(p))
-            base = parsed.scheme + "://" + parsed.netloc + parsed.path.rsplit("/", 1)[0]
-            ns_tree[base].append(p)
 
-    # Sorteer alleen predicates met data
-    predicates = sorted(predicate_samples.keys(), key=lambda p: str(p))
+    # Genereer interactieve GraphView
+    st.markdown("### 🧭 RDF Model Visualisatie")
+    net = Network(height='600px', directed=True)
 
-    def format_predicate(p):
-        voorbeeld = ", ".join(predicate_samples[p])
-        return f"{str(p)}  ➜  [{voorbeeld}]"
+    for s, p, o in g:
+        if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
+            net.add_node(str(s), label=str(s).split("/")[-1][:30], shape='ellipse')
+            net.add_node(str(o), label=str(o).split("/")[-1][:30], shape='box')
+            net.add_edge(str(s), str(o), label=str(p).split("/")[-1][:30])
 
-    predicate_map = {format_predicate(p): p for p in predicates}
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".html")
+    net.save_graph(tmp_file.name)
+    with open(tmp_file.name, 'r', encoding='utf-8') as f:
+        html = f.read()
+    components.html(html, height=600, scrolling=True)
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
+    predicate_map = {str(p): p for p in predicate_samples.keys()}
     kolom_mapping = {}
 
     for kolom in kolommen:
-        with st.expander(f"Koppel RDF eigenschap aan kolom '{kolom}'"):
-            for base, props in sorted(ns_tree.items()):
-                with st.container():
-                    st.markdown(f"**{base}**")
-                    opts = [format_predicate(p) for p in props if p in predicate_samples]
-                    if opts:
-                        selectie = st.radio("Kies eigenschap", opts, key=f"{kolom}_{base}", label_visibility="collapsed")
-                        kolom_mapping[kolom] = predicate_map[selectie]
-                        break
+        opties = [f"{str(p)} ➜ [{', '.join(predicate_samples[p])}]" for p in predicate_samples]
+        selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=kolom)
+        uri = selectie.split(" ➜ ")[0].strip()
+        kolom_mapping[kolom] = URIRef(uri)
 
     if len(kolom_mapping) < len(kolommen):
         st.warning("Niet alle kolommen zijn gemapped.")

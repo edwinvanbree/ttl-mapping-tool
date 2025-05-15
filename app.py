@@ -19,15 +19,18 @@ if uploaded_ttl and uploaded_excel:
     df_excel = pd.read_excel(uploaded_excel)
     kolommen = df_excel.columns.tolist()
 
-    # Verzamel unieke eigenschappen met representatieve voorbeelddata
-    predicate_samples = {}
+    # Verzamel unieke eigenschappen met meerdere voorbeeldwaarden
+    predicate_samples = defaultdict(list)
     for s, p, o in g:
         if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
-            if p not in predicate_samples:
-                predicate_samples[p] = str(o)
+            if len(predicate_samples[p]) < 5:
+                predicate_samples[p].append(str(o))
 
     predicates = list(predicate_samples.keys())
-    predicate_labels = {str(p): f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates}
+    predicate_labels = {
+        str(p): f"{str(p)} ➔ [{'; '.join(predicate_samples[p])}]"
+        for p in predicates
+    }
     label_to_uri = {v: k for k, v in predicate_labels.items()}
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
@@ -65,7 +68,8 @@ if uploaded_ttl and uploaded_excel:
     for s in set(g.subjects()):
         root_waarde = g.value(subject=s, predicate=kolom_mapping.get(root_kolom))
         if root_waarde:
-            rij = {root_kolom: str(root_waarde)}
+            rij = {k: "" for k in kolommen}  # alle kolommen initieel leeg
+            rij[root_kolom] = str(root_waarde)
             for kolom in kolommen:
                 if kolom == root_kolom:
                     continue

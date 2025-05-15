@@ -58,32 +58,30 @@ if uploaded_ttl and uploaded_excel:
             if uri:
                 st.session_state.kolom_mapping[kolom] = uri
 
-    # Check alleen op niet-root kolommen
-    niet_root_kolommen = [k for k in kolommen if k != root_kolom]
-    if all(st.session_state.kolom_mapping.get(k) for k in niet_root_kolommen):
-        kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items() if uri}
+    kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items() if uri}
 
-        # Bouw resultaat
-        resultaat_data = []
-        for s in set(g.subjects()):
-            root_waarde = g.value(subject=s, predicate=kolom_mapping.get(root_kolom))
-            if root_waarde:
-                rij = {root_kolom: str(root_waarde)}
-                for kolom in niet_root_kolommen:
-                    pred = kolom_mapping.get(kolom)
+    # Bouw resultaat
+    resultaat_data = []
+    for s in set(g.subjects()):
+        root_waarde = g.value(subject=s, predicate=kolom_mapping.get(root_kolom))
+        if root_waarde:
+            rij = {root_kolom: str(root_waarde)}
+            for kolom in kolommen:
+                if kolom == root_kolom:
+                    continue
+                pred = kolom_mapping.get(kolom)
+                if pred:
                     val = g.value(subject=s, predicate=pred)
                     rij[kolom] = str(val) if val else ""
-                resultaat_data.append(rij)
+            resultaat_data.append(rij)
 
-        if resultaat_data:
-            df_resultaat = pd.DataFrame(resultaat_data)
-            st.markdown("### 📋 Gematchte Data")
-            st.dataframe(df_resultaat)
+    if resultaat_data:
+        df_resultaat = pd.DataFrame(resultaat_data)
+        st.markdown("### 📋 Gematchte Data")
+        st.dataframe(df_resultaat)
 
-            buffer = BytesIO()
-            df_resultaat.to_excel(buffer, index=False)
-            st.download_button("📅 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
-        else:
-            st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")
+        buffer = BytesIO()
+        df_resultaat.to_excel(buffer, index=False)
+        st.download_button("📅 Download resultaat als Excel", buffer.getvalue(), file_name="rdf_mapping_export.xlsx")
     else:
-        st.info("Wacht op volledige mapping van alle kolommen behalve de root.")
+        st.warning("Er is geen matchende data gevonden voor de gekozen mappings.")

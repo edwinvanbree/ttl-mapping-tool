@@ -31,36 +31,25 @@ if uploaded_ttl and uploaded_excel:
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
 
-    # Root-kolom eerst kiezen
     root_kolom = st.selectbox("Welke kolom bevat de 'root node'?", kolommen)
 
-    # Initialiseer session state mapping als het er nog niet is
-    if 'kolom_mapping' not in st.session_state:
-        st.session_state.kolom_mapping = {}
-        st.session_state.gebruikte_predicaten = set()
+    with st.form("mapping_form"):
+        gekozen_mapping = {}
+        beschikbare_predicaten = list(predicate_samples.keys())
 
-    for i, kolom in enumerate(kolommen):
-        if kolom in st.session_state.kolom_mapping:
-            gekozen = st.session_state.kolom_mapping[kolom]
-            st.markdown(f"**{kolom}** is gekoppeld aan: `{gekozen}`")
-            continue
+        for kolom in kolommen:
+            opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in beschikbare_predicaten]
+            selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{kolom}")
+            uri = selectie.split(" ➜ ")[0].strip()
+            gekozen_mapping[kolom] = URIRef(uri)
+            beschikbare_predicaten = [p for p in beschikbare_predicaten if str(p) != uri]
 
-        beschikbare_predicaten = [p for p in predicate_samples if p not in st.session_state.gebruikte_predicaten]
-        opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in beschikbare_predicaten]
+        submitted = st.form_submit_button("Bevestig mapping")
 
-        if not opties:
-            st.warning("Er zijn geen beschikbare RDF-eigenschappen meer om te koppelen.")
-            break
+    if submitted:
+        st.session_state.kolom_mapping = gekozen_mapping
 
-        selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{kolom}")
-        uri = selectie.split(" ➜ ")[0].strip()
-        gekozen_pred = URIRef(uri)
-        st.session_state.kolom_mapping[kolom] = gekozen_pred
-        st.session_state.gebruikte_predicaten.add(gekozen_pred)
-
-    if len(st.session_state.kolom_mapping) < len(kolommen):
-        st.warning("Niet alle kolommen zijn gemapped.")
-    else:
+    if "kolom_mapping" in st.session_state and len(st.session_state.kolom_mapping) == len(kolommen):
         kolom_mapping = st.session_state.kolom_mapping
         # Bouw resultaat
         resultaat_data = []

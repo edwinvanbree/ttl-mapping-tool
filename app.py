@@ -21,26 +21,24 @@ if uploaded_ttl and uploaded_excel:
     df_excel = pd.read_excel(uploaded_excel)
     kolommen = df_excel.columns.tolist()
 
-    # Verzamel unieke eigenschappen met voorbeelddata
-    predicate_samples = defaultdict(list)
+    # Verzamel unieke eigenschappen met representatieve voorbeelddata
+    predicate_samples = {}
     for s, p, o in g:
         if not str(p).startswith("http://www.w3.org/1999/02/22-rdf-syntax-ns#"):
-            if len(predicate_samples[p]) < 3:
-                predicate_samples[p].append(str(o))
+            if p not in predicate_samples:
+                predicate_samples[p] = str(o)
 
     predicates = list(predicate_samples.keys())
 
     # Genereer Cytoscape JSON
     elements = []
-    added_edges = set()
     for i, p in enumerate(predicates):
         label = str(p).split("/")[-1]
         node_id = f"pred_{i}"
         elements.append({"data": {"id": node_id, "label": label}})
-        added_edges.add((node_id, label))
 
     # Inject cytoscapejs view
-    st.markdown("### 🧭 Klik op een eigenschap om een Excel-kolom te koppelen")
+    st.markdown("### 🧭 RDF Eigenschappenoverzicht")
     components.html(f"""
     <html>
     <head>
@@ -49,14 +47,14 @@ if uploaded_ttl and uploaded_excel:
     <body>
     <div id="cy" style="width: 100%; height: 600px;"></div>
     <script>
-    var cy = cytoscape({
+    var cy = cytoscape({{
       container: document.getElementById('cy'),
       elements: {json.dumps(elements)},
       style: [
         {{ selector: 'node', style: {{ 'label': 'data(label)', 'background-color': '#0074D9', 'color': '#fff', 'text-valign': 'center' }} }}
       ],
       layout: {{ name: 'grid', rows: 4 }}
-    });
+    }});
     </script>
     </body>
     </html>
@@ -67,7 +65,7 @@ if uploaded_ttl and uploaded_excel:
     kolom_mapping = {}
 
     for i, kolom in enumerate(kolommen):
-        opties = [f"{str(p)} ➜ [{', '.join(predicate_samples[p])}]" for p in predicate_samples]
+        opties = [f"{str(p)} ➜ [{predicate_samples[p]}]" for p in predicate_samples]
         selectie = st.selectbox(f"Kies RDF eigenschap voor kolom '{kolom}'", opties, key=f"select_{i}")
         uri = selectie.split(" ➜ ")[0].strip()
         kolom_mapping[kolom] = URIRef(uri)

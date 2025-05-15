@@ -37,32 +37,26 @@ if uploaded_ttl and uploaded_excel:
     if 'kolom_mapping' not in st.session_state:
         st.session_state.kolom_mapping = {kolom: None for kolom in kolommen}
 
-    with st.form("mapping_form"):
-        for kolom in kolommen:
-            opties = ["-- Maak een keuze --"] + [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
-            default_index = 0
-            if st.session_state.kolom_mapping.get(kolom):
-                try:
-                    uri_str = str(st.session_state.kolom_mapping[kolom])
-                    default_index = opties.index(next(opt for opt in opties if opt.startswith(uri_str)))
-                except StopIteration:
-                    default_index = 0
+    for kolom in kolommen:
+        opties = ["-- Maak een keuze --"] + [f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates]
+        default_index = 0
+        if st.session_state.kolom_mapping.get(kolom):
+            try:
+                uri_str = str(st.session_state.kolom_mapping[kolom])
+                default_index = opties.index(next(opt for opt in opties if opt.startswith(uri_str)))
+            except StopIteration:
+                default_index = 0
 
-            selectie = st.selectbox(
-                f"Kies RDF eigenschap voor kolom '{kolom}'",
-                opties,
-                index=default_index,
-                key=f"select_{kolom}"
-            )
+        selectie = st.selectbox(
+            f"Kies RDF eigenschap voor kolom '{kolom}'",
+            opties,
+            index=default_index,
+            key=f"select_{kolom}"
+        )
 
-            if selectie != "-- Maak een keuze --":
-                uri = selectie.split(" ➔ ")[0].strip()
-                st.session_state.kolom_mapping[kolom] = URIRef(uri)
-
-        submitted = st.form_submit_button("Bevestig mapping")
-
-    if submitted:
-        st.success("Mapping bevestigd.")
+        if selectie != "-- Maak een keuze --":
+            uri = selectie.split(" ➔ ")[0].strip()
+            st.session_state.kolom_mapping[kolom] = URIRef(uri)
 
     if all(st.session_state.kolom_mapping.values()):
         kolom_mapping = st.session_state.kolom_mapping

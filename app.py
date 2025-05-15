@@ -28,6 +28,7 @@ if uploaded_ttl and uploaded_excel:
 
     predicates = list(predicate_samples.keys())
     predicate_labels = {str(p): f"{str(p)} ➔ [{predicate_samples[p]}]" for p in predicates}
+    label_to_uri = {v: k for k, v in predicate_labels.items()}
 
     st.markdown("### 🗂️ Mapping van Excel kolommen naar RDF eigenschappen")
 
@@ -38,26 +39,24 @@ if uploaded_ttl and uploaded_excel:
         st.session_state.kolom_mapping = {kolom: "" for kolom in kolommen}
 
     for kolom in kolommen:
-        opties = ["-- Maak een keuze --"] + [predicate_labels[str(p)] for p in predicates]
-        huidige_uri = st.session_state.kolom_mapping.get(kolom, "")
+        opties = ["-- Maak een keuze --"] + list(predicate_labels.values())
 
-        default_index = 0
-        if huidige_uri:
-            for i, opt in enumerate(opties):
-                if opt.startswith(huidige_uri):
-                    default_index = i
-                    break
+        huidige_uri = st.session_state.kolom_mapping.get(kolom, "")
+        huidige_label = predicate_labels.get(huidige_uri, "-- Maak een keuze --")
 
         selectie = st.selectbox(
             f"Kies RDF eigenschap voor kolom '{kolom}'",
-            opties,
-            index=default_index,
-            key=f"select_{kolom}"
+            options=opties,
+            index=0 if huidige_label not in opties else None,
+            key=f"select_{kolom}",
+            label_visibility="visible",
+            placeholder="-- Maak een keuze --"
         )
 
-        if selectie != "-- Maak een keuze --":
-            uri = selectie.split(" ➔ ")[0].strip()
-            st.session_state.kolom_mapping[kolom] = uri
+        if selectie and selectie != "-- Maak een keuze --":
+            uri = label_to_uri.get(selectie)
+            if uri:
+                st.session_state.kolom_mapping[kolom] = uri
 
     if all(st.session_state.kolom_mapping.values()):
         kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items()}

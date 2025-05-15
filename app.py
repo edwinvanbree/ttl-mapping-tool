@@ -65,14 +65,22 @@ if uploaded_ttl and uploaded_excel:
         if st.button(f"🔍 Toon alternatieve eigenschappen voor '{kolom}'", key=f"alternatieven_{kolom}"):
             st.markdown(f"#### Mogelijke alternatieven voor '{kolom}':")
             suggesties = []
+            kolom_termen = kolom.lower().split()
             for p in predicates:
                 if str(p) != st.session_state.kolom_mapping.get(kolom):
+                    label_match = any(term in str(p).lower() for term in kolom_termen)
                     values = list(g.objects(predicate=p))
+                    waarde_match = False
+                    voorbeeld = ""
                     for v in values:
                         if isinstance(v, str) or isinstance(v, URIRef):
-                            if any(keyword in str(v).lower() for keyword in kolom.lower().split()):
-                                suggesties.append((str(p), str(v)))
+                            voorbeeld = str(v)
+                            if any(term in str(v).lower() for term in kolom_termen):
+                                waarde_match = True
                                 break
+                    if label_match or waarde_match:
+                        suggesties.append((str(p), voorbeeld))
+
             if suggesties:
                 for s in suggesties:
                     st.markdown(f"• **{s[0]}**  → voorbeeld: `{s[1]}`")

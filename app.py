@@ -45,23 +45,29 @@ if uploaded_ttl and uploaded_excel:
         huidige_uri = st.session_state.kolom_mapping.get(kolom, "")
 
         st.markdown(f"**Kolom '{kolom}'**")
-        zoekterm = st.text_input(f"Zoekterm voor eigenschap van '{kolom}'", key=f"zoek_{kolom}")
-        zoeken = st.button(f"🔍 Zoek", key=f"zoek_btn_{kolom}")
 
-        if zoeken and zoekterm:
-            matches = []
-            for p in predicates:
-                if zoekterm.lower() in str(p).lower() or any(zoekterm.lower() in str(v).lower() for v in predicate_samples[p]):
-                    matches.append((str(p), predicate_samples[p]))
+        if f"zoek_klik_{kolom}" not in st.session_state:
+            st.session_state[f"zoek_klik_{kolom}"] = False
 
-            if matches:
-                labels = [f"{m[0]} ➔ [{'; '.join(m[1])}]" for m in matches]
-                selectie = st.radio("Kies een eigenschap", options=labels, key=f"radio_{kolom}")
-                if selectie:
-                    uri = selectie.split(" ➔ ")[0].strip()
-                    st.session_state.kolom_mapping[kolom] = uri
-            else:
-                st.info("Geen eigenschappen gevonden voor deze zoekterm.")
+        if st.button(f"🔍 Zoek RDF eigenschap voor '{kolom}'", key=f"zoek_btn_{kolom}"):
+            st.session_state[f"zoek_klik_{kolom}"] = True
+
+        if st.session_state[f"zoek_klik_{kolom}"]:
+            zoekterm = st.text_input(f"Zoekterm voor '{kolom}'", key=f"zoek_{kolom}")
+            if zoekterm:
+                matches = []
+                for p in predicates:
+                    if zoekterm.lower() in str(p).lower() or any(zoekterm.lower() in str(v).lower() for v in predicate_samples[p]):
+                        matches.append((str(p), predicate_samples[p]))
+
+                if matches:
+                    labels = [f"{m[0]} ➔ [{'; '.join(m[1])}]" for m in matches]
+                    selectie = st.radio("Kies een eigenschap", options=labels, key=f"radio_{kolom}")
+                    if selectie:
+                        uri = selectie.split(" ➔ ")[0].strip()
+                        st.session_state.kolom_mapping[kolom] = uri
+                else:
+                    st.info("Geen eigenschappen gevonden voor deze zoekterm.")
 
     kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items() if uri}
 

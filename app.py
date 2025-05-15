@@ -61,6 +61,24 @@ if uploaded_ttl and uploaded_excel:
             if uri:
                 st.session_state.kolom_mapping[kolom] = uri
 
+        # Toon alternatieven knop
+        if st.button(f"🔍 Toon alternatieve eigenschappen voor '{kolom}'", key=f"alternatieven_{kolom}"):
+            st.markdown(f"#### Mogelijke alternatieven voor '{kolom}':")
+            suggesties = []
+            for p in predicates:
+                if str(p) != st.session_state.kolom_mapping.get(kolom):
+                    values = list(g.objects(predicate=p))
+                    for v in values:
+                        if isinstance(v, str) or isinstance(v, URIRef):
+                            if any(keyword in str(v).lower() for keyword in kolom.lower().split()):
+                                suggesties.append((str(p), str(v)))
+                                break
+            if suggesties:
+                for s in suggesties:
+                    st.markdown(f"• **{s[0]}**  → voorbeeld: `{s[1]}`")
+            else:
+                st.info("Geen relevante alternatieve eigenschappen gevonden.")
+
     kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items() if uri}
 
     # Bouw resultaat

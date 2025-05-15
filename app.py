@@ -42,50 +42,24 @@ if uploaded_ttl and uploaded_excel:
         st.session_state.kolom_mapping = {kolom: "" for kolom in kolommen}
 
     for kolom in kolommen:
-        opties = ["-- Maak een keuze --"] + list(predicate_labels.values())
-
         huidige_uri = st.session_state.kolom_mapping.get(kolom, "")
-        huidige_label = predicate_labels.get(huidige_uri, "-- Maak een keuze --")
 
-        selectie = st.selectbox(
-            f"Kies RDF eigenschap voor kolom '{kolom}'",
-            options=opties,
-            index=0 if huidige_label not in opties else None,
-            key=f"select_{kolom}",
-            label_visibility="visible",
-            placeholder="-- Maak een keuze --"
-        )
+        st.markdown(f"**Kolom '{kolom}'**")
+        zoekterm = st.text_input(f"Zoek eigenschap voor '{kolom}'", key=f"zoek_{kolom}")
 
-        if selectie and selectie != "-- Maak een keuze --":
-            uri = label_to_uri.get(selectie)
-            if uri:
+        matches = []
+        for p in predicates:
+            if zoekterm.lower() in str(p).lower() or any(zoekterm.lower() in str(v).lower() for v in predicate_samples[p]):
+                matches.append((str(p), predicate_samples[p]))
+
+        if matches:
+            labels = [f"{m[0]} ➔ [{'; '.join(m[1])}]" for m in matches]
+            selectie = st.radio("Kies een eigenschap", options=labels, key=f"radio_{kolom}")
+            if selectie:
+                uri = selectie.split(" ➔ ")[0].strip()
                 st.session_state.kolom_mapping[kolom] = uri
-
-        # Toon alternatieven knop
-        if st.button(f"🔍 Toon alternatieve eigenschappen voor '{kolom}'", key=f"alternatieven_{kolom}"):
-            st.markdown(f"#### Mogelijke alternatieven voor '{kolom}':")
-            suggesties = []
-            kolom_termen = kolom.lower().split()
-            for p in predicates:
-                if str(p) != st.session_state.kolom_mapping.get(kolom):
-                    label_match = any(term in str(p).lower() for term in kolom_termen)
-                    values = list(g.objects(predicate=p))
-                    waarde_match = False
-                    voorbeeld = ""
-                    for v in values:
-                        if isinstance(v, str) or isinstance(v, URIRef):
-                            voorbeeld = str(v)
-                            if any(term in str(v).lower() for term in kolom_termen):
-                                waarde_match = True
-                                break
-                    if label_match or waarde_match:
-                        suggesties.append((str(p), voorbeeld))
-
-            if suggesties:
-                for s in suggesties:
-                    st.markdown(f"• **{s[0]}**  → voorbeeld: `{s[1]}`")
-            else:
-                st.info("Geen relevante alternatieve eigenschappen gevonden.")
+        else:
+            st.info("Geen eigenschappen gevonden voor deze zoekterm.")
 
     kolom_mapping = {kol: URIRef(uri) for kol, uri in st.session_state.kolom_mapping.items() if uri}
 
